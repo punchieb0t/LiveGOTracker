@@ -52,6 +52,19 @@
             cursor: pointer;
         }
         #alerts-btn:hover { background: #e55a00; }
+        #stations-btn {
+            position: absolute;
+            top: 10px;
+            right: 220px;
+            z-index: 1000;
+            padding: 10px 20px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        #stations-btn:hover { background: #218838; }
         #alerts-panel {
             display: none;
             position: absolute;
@@ -100,6 +113,7 @@
         <div class="update">Loading...</div>
     </div>
     <button id="alerts-btn" onclick="toggleAlerts()">Alerts</button>
+    <button id="stations-btn" onclick="toggleStations()">Stations</button>
     <button id="refresh" onclick="fetchTrains()">Refresh</button>
     <div id="alerts-panel">
         <h2>Service Alerts</h2>
@@ -126,6 +140,61 @@
             'ST': '#8B4513'   // Stouffville - Brown
         };
         
+        // Major GO Stations with coordinates and line
+        const stations = [
+            { code: 'UN', name: 'Union Station', lat: 43.6425, lng: -79.3892, lines: ['LW', 'LE', 'MI', 'KI', 'RH', 'BR', 'ST'] },
+            { code: 'CL', name: 'Clarkson', lat: 43.5131, lng: -79.6332, lines: ['LW'] },
+            { code: 'LC', name: 'Long Branch', lat: 43.6100, lng: -79.6465, lines: ['LW'] },
+            { code: 'MI', name: 'Mimico', lat: 43.6285, lng: -79.6605, lines: ['LW'] },
+            { code: 'NC', name: 'North York', lat: 43.7117, lng: -79.4162, lines: ['BR'] },
+            { code: 'RH', name: 'Richmond Hill', lat: 43.8752, lng: -79.4398, lines: ['RH'] },
+            { code: 'AG', name: 'Agincourt', lat: 43.7878, lng: -79.2243, lines: ['ST'] },
+            { code: 'MU', name: 'Milliken', lat: 43.8161, lng: -79.2995, lines: ['ST'] },
+            { code: 'WH', name: 'Whitby', lat: 43.8970, lng: -78.9072, lines: ['LE'] },
+            { code: 'AJ', name: 'Ajax', lat: 43.8535, lng: -79.0320, lines: ['LE'] },
+            { code: 'PK', name: 'Pickering', lat: 43.8123, lng: -79.0865, lines: ['LE'] },
+            { code: 'OA', name: 'Oakville', lat: 43.4500, lng: -79.6825, lines: ['LW'] },
+            { code: 'BT', name: 'Burlington', lat: 43.3490, lng: -79.8142, lines: ['LW'] },
+            { code: 'AL', name: 'Aldershot', lat: 43.3167, lng: -79.8500, lines: ['LW'] },
+            { code: 'WL', name: 'West Harbour', lat: 43.2758, lng: -79.7539, lines: ['LW'] },
+            { code: 'HA', name: 'Hamilton GO', lat: 43.2579, lng: -79.8713, lines: ['LW'] },
+            { code: 'LI', name: 'Lisgar', lat: 43.7747, lng: -79.7024, lines: ['KI'] },
+            { code: 'BR', name: 'Brampton', lat: 43.6841, lng: -79.7567, lines: ['KI'] },
+            { code: 'MA', name: 'Mount Pleasant', lat: 43.6895, lng: -79.8429, lines: ['KI'] },
+            { code: 'GE', name: 'Georgetown', lat: 43.6511, lng: -79.9030, lines: ['KI'] },
+            { code: 'AU', name: 'Aurora', lat: 44.0064, lng: -79.4487, lines: ['RH'] },
+            { code: 'NK', name: 'Newmarket', lat: 44.0562, lng: -79.4624, lines: ['RH'] },
+            { code: 'BF', name: 'Bradford', lat: 44.1203, lng: -79.5586, lines: ['RH'] },
+            { code: 'EG', name: 'East Gwillimbury', lat: 44.1906, lng: -79.4394, lines: ['RH'] },
+            { code: 'ON', name: 'Oriole', lat: 43.7815, lng: -79.3384, lines: ['BR'] },
+            { code: 'KG', name: 'King', lat: 44.0428, lng: -79.5109, lines: ['BR'] },
+            { code: 'BS', name: 'Barrie South', lat: 44.3932, lng: -79.6689, lines: ['BR'] },
+            { code: 'BR', name: 'Barrie', lat: 44.3892, lng: -79.6831, lines: ['BR'] },
+            { code: 'STO', name: 'Stouffville', lat: 43.9894, lng: -79.2553, lines: ['ST'] },
+            { code: 'G', name: 'Guildwood', lat: 43.7846, lng: -79.1767, lines: ['ST'] },
+            { code: 'R', name: 'Rouge Hill', lat: 43.8105, lng: -79.1586, lines: ['ST'] },
+            { code: 'P', name: 'Pickering', lat: 43.8123, lng: -79.0865, lines: ['ST'] },
+            { code: 'ML', name: 'Milton', lat: 43.5153, lng: -79.8825, lines: ['MI'] },
+            { code: 'AC', name: 'Acton', lat: 43.6339, lng: -80.0699, lines: ['KI'] },
+            { code: 'GU', name: 'Guelph', lat: 43.5448, lng: -80.2481, lines: ['KI'] },
+            { code: 'SG', name: 'Stratford', lat: 43.3733, lng: -80.9838, lines: ['KI'] },
+        ];
+        
+        // Add stations to map
+        stations.forEach(station => {
+            const color = lineColors[station.lines[0]] || '#666';
+            const stationIcon = L.divIcon({
+                className: 'station-marker',
+                html: `<div style="background:${color};width:12px;height:12px;border-radius:50%;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></div>`,
+                iconSize: [12, 12],
+                iconAnchor: [6, 6]
+            });
+            const marker = L.marker([station.lat, station.lng], { icon: stationIcon })
+                .bindPopup(`<b>${station.name}</b><br>Code: ${station.code}<br>Lines: ${station.lines.join(', ')}`)
+                .addTo(map);
+            stationMarkers.push(marker);
+        });
+        
         function getTrainIcon(color) {
             return L.divIcon({
                 className: 'train-marker',
@@ -144,12 +213,19 @@
         
         function toggleAlerts() {
             const panel = document.getElementById('alerts-panel');
-            if (panel.style.display === 'block') {
-                panel.style.display = 'none';
-            } else {
-                panel.style.display = 'block';
-                fetchAlerts();
-            }
+            panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+            if (panel.style.display === 'block') fetchAlerts();
+        }
+        
+        let stationsVisible = true;
+        const stationMarkers = [];
+        
+        function toggleStations() {
+            stationsVisible = !stationsVisible;
+            stationMarkers.forEach(m => {
+                if (stationsVisible) map.addLayer(m);
+                else map.removeLayer(m);
+            });
         }
         
         async function fetchAlerts() {
