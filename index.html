@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>GO Transit Train Tracker</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        #map { height: 100vh; width: 100%; }
+        .train-popup { min-width: 200px; }
+        .train-popup h3 { margin: 0 0 10px 0; color: #0066cc; }
+        .train-popup .info { margin: 5px 0; }
+        .train-popup .delay-good { color: green; }
+        .train-popup .delay-bad { color: red; font-weight: bold; }
+        .train-popup .moving { color: green; }
+        .train-popup .stopped { color: orange; }
+        #header {
+            position: absolute;
+            top: 10px;
+            left: 60px;
+            z-index: 1000;
+            background: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+        #header h1 { margin: 0; font-size: 18px; }
+        #header .update { font-size: 12px; color: #666; }
+        #refresh {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            padding: 10px 20px;
+            background: #0066cc;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        #refresh:hover { background: #0055aa; }
+    </style>
+</head>
+<body>
+    <div id="header">
+        <h1>🚂 GO Transit Train Tracker</h1>
+        <div class="update">Loading...</div>
+    </div>
+    <button id="refresh" onclick="fetchTrains()">Refresh</button>
+    <div id="map"></div>
+    
+    <script>
+        const map = L.map('map').setView([43.65, -79.38], 10);
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap'
+        }).addTo(map);
+        
+        const markers = {};
+        // Line colors from GO Transit
+        const lineColors = {
+            'LW': '#8B0000',  // Lakeshore West - Dark red
+            'LE': '#FF0000',  // Lakeshore East - Bright red
+            'MI': '#FF6600',  // Milton - Orange
+            'KI': '#008000',  // Kitchener - Green
+            'RH': '#87CEEB',  // Richmond Hill - Light blue
+            'BR': '#00008B',  // Barrie - Dark blue
+            'ST': '#8B4513'   // Stouffville - Brown
+        };
+        
+        function getTrainIcon(color) {
+            return L.divIcon({
+                className: 'train-marker',
+                html: `<div style="background:${color};border-radius:50%;width:20px;height:20px;border:2px solid white;box-shadow:0 2px 5px rgba(0,0,0,0.3);"></div>`,
+                iconSize: [20, 20],
+                iconAnchor: [10, 10]
+            });
+        }
+        
+        const defaultIcon = L.divIcon({
+            className: 'train-marker',
+            html: '<div style="background:#0066cc;border-radius:50%;width:20px;height:20px;border:2px solid white;box-shadow:0 2px 5px rgba(0,0,0,0.3);"></div>',
+            iconSize: [20, 20],
+            iconAnchor: [10, 10]
+        });
+        
+        async function fetchTrains() {
+            document.querySelector('.update').textContent = 'Loading...';
+            
+            try {
+                const response = await fetch('/api/trains');
+                const data = await response.json();
+                
+                const trains = data.Trips.Trip;
+                const timestamp = data.Metadata.TimeStamp;
+                
+                document.querySelector('.update').textContent = 'Updated: ' + timestamp;
+                
+                // Clear old markers
+                Object.values(markers).forEach(m => map.removeLayer(m));
+                
+                trains.forEach(train => {
+                    const lat = train.Latitude;
+                    const lng = train.Longitude;
+                    
+                    if (!lat || !lng || lat < 40 || lng < -85) return;
+                    
+                    const delayMins = Math.round(train.DelaySeconds / 60);
+                    const delayClass = delayMins > 0 ? 'delay-bad' : 'delay-good';
+                    const delayText = delayMins > 0 ? `+${delayMins} min` : `${delayMins} min`;
+                    const statusText = train.IsInMotion ? '🚂 Moving' : '🛑 At Station';
+                    const statusClass = train.IsInMotion ? 'moving' : 'stopped';
+                    
+                    const popup = `
+                        <div class="train-popup">
+                            <h3>Trip ${train.TripNumber}</h3>
+                            <div class="info"><b>Line:</b> ${train.LineCode}</div>
+                            <div class="info"><b>Route:</b> ${train.Display}</div>
+                            <div class="info"><b>Time:</b> ${train.StartTime} - ${train.EndTime}</div>
+                            <div class="info"><b>Cars:</b> ${train.Cars}</div>
+                            <div class="info ${statusClass}"><b>Status:</b> ${statusText}</div>
+                            <div class="info ${delayClass}"><b>Delay:</b> ${delayText}</div>
+                            <div class="info"><b>Next Stop:</b> ${train.NextStopCode || 'N/A'}</div>
+                        </div>
+                    `;
+                    
+                    const lineCode = train.LineCode;
+                    const color = lineColors[lineCode] || '#0066cc';
+                    const icon = getTrainIcon(color);
+                    
+                    const marker = L.marker([lat, lng], { icon: icon })
+                        .bindPopup(popup)
+                        .addTo(map);
+                    
+                    markers[train.TripNumber] = marker;
+                });
+                
+            } catch (error) {
+                console.error('Error:', error);
+                document.querySelector('.update').textContent = 'Error loading trains';
+            }
+        }
+        
+        fetchTrains();
+        setInterval(fetchTrains, 60000); // Refresh every minute
+    </script>
+</body>
+</html>
