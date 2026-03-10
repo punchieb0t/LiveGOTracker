@@ -8,8 +8,25 @@ BASE_URL = "https://api.openmetrolinx.com/OpenDataAPI/api/V1"
 class ProxyHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path == '/api/trains':
-            # Proxy the API request
+            # Proxy the trains API
             url = f"{BASE_URL}/ServiceataGlance/Trains/All?key={API_KEY}"
+            try:
+                req = urllib.request.Request(url)
+                req.add_header('User-Agent', 'Mozilla/5.0')
+                response = urllib.request.urlopen(req, timeout=30)
+                data = response.read()
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(data)
+            except Exception as e:
+                self.send_response(500)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'error': str(e)}).encode())
+        elif self.path == '/api/alerts':
+            # Proxy the alerts API
+            url = f"{BASE_URL}/ServiceUpdate/ServiceAlert/All?key={API_KEY}"
             try:
                 req = urllib.request.Request(url)
                 req.add_header('User-Agent', 'Mozilla/5.0')

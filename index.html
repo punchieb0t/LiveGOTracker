@@ -39,14 +39,72 @@
             cursor: pointer;
         }
         #refresh:hover { background: #0055aa; }
+        #alerts-btn {
+            position: absolute;
+            top: 10px;
+            right: 120px;
+            z-index: 1000;
+            padding: 10px 20px;
+            background: #ff6600;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        #alerts-btn:hover { background: #e55a00; }
+        #alerts-panel {
+            display: none;
+            position: absolute;
+            top: 60px;
+            left: 10px;
+            width: 350px;
+            max-height: 400px;
+            overflow-y: auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            z-index: 1000;
+            padding: 15px;
+        }
+        #alerts-panel h2 { margin: 0 0 10px 0; font-size: 16px; }
+        .alert-item {
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+        }
+        .alert-item .alert-line {
+            font-weight: bold;
+            font-size: 12px;
+            color: #666;
+        }
+        .alert-item .alert-subject {
+            font-weight: bold;
+            margin: 5px 0;
+        }
+        .alert-item .alert-body {
+            font-size: 12px;
+            color: #333;
+        }
+        .alert-item .alert-station {
+            font-size: 11px;
+            color: #888;
+            margin-top: 5px;
+        }
     </style>
 </head>
 <body>
     <div id="header">
-        <h1>🚂 GO Transit Train Tracker</h1>
+        <h1>GO Transit Train Tracker</h1>
         <div class="update">Loading...</div>
     </div>
+    <button id="alerts-btn" onclick="toggleAlerts()">Alerts</button>
     <button id="refresh" onclick="fetchTrains()">Refresh</button>
+    <div id="alerts-panel">
+        <h2>Service Alerts</h2>
+        <div id="alerts-list">Loading...</div>
+    </div>
     <div id="map"></div>
     
     <script>
@@ -84,6 +142,48 @@
             iconAnchor: [10, 10]
         });
         
+        function toggleAlerts() {
+            const panel = document.getElementById('alerts-panel');
+            if (panel.style.display === 'block') {
+                panel.style.display = 'none';
+            } else {
+                panel.style.display = 'block';
+                fetchAlerts();
+            }
+        }
+        
+        async function fetchAlerts() {
+            try {
+                const response = await fetch('/api/alerts');
+                const data = await response.json();
+                
+                const alerts = data.Messages.Message;
+                const container = document.getElementById('alerts-list');
+                
+                if (!alerts || alerts.length === 0) {
+                    container.innerHTML = '<p>No alerts</p>';
+                    return;
+                }
+                
+                container.innerHTML = alerts.slice(0, 10).map(alert => {
+                    const lines = alert.Lines.map(l => l.Code).join(', ');
+                    const stations = alert.Stops.map(s => s.Code).join(', ');
+                    return `
+                        <div class="alert-item">
+                            <div class="alert-line">Line: ${lines || 'System-wide'}</div>
+                            <div class="alert-subject">${alert.SubjectEnglish}</div>
+                            <div class="alert-body">${(alert.BodyEnglish || '').substring(0, 150)}...</div>
+                            ${stations ? `<div class="alert-station">Stations: ${stations}</div>` : ''}
+                        </div>
+                    `;
+                }).join('');
+                
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('alerts-list').textContent = 'Error loading alerts';
+            }
+        }
+        
         async function fetchTrains() {
             document.querySelector('.update').textContent = 'Loading...';
             
@@ -106,21 +206,24 @@
                     if (!lat || !lng || lat < 40 || lng < -85) return;
                     
                     const delayMins = Math.round(train.DelaySeconds / 60);
-                    const delayClass = delayMins > 0 ? 'delay-bad' : 'delay-good';
-                    const delayText = delayMins > 0 ? `+${delayMins} min` : `${delayMins} min`;
-                    const statusText = train.IsInMotion ? '🚂 Moving' : '🛑 At Station';
+                    const delayClass = delayMins > 0 ? 'delay-bad' : (delayMins < 0 ? 'delay-good' : '');
+                    const delayText = delayMins > 0 ? `+${delayMins} min` : (delayMins < 0 ? `${delayMins} min (Early)` : 'On Time');
+                    const statusText = train.IsInMotion ? 'Moving' : 'At Station';
                     const statusClass = train.IsInMotion ? 'moving' : 'stopped';
+                    const nextStop = train.NextStopCode || 'Final Stop';
+                    const prevStop = train.PrevStopCode || 'Start';
                     
                     const popup = `
                         <div class="train-popup">
                             <h3>Trip ${train.TripNumber}</h3>
-                            <div class="info"><b>Line:</b> ${train.LineCode}</div>
-                            <div class="info"><b>Route:</b> ${train.Display}</div>
+                            <div class="info"><b>Line:</b> ${train.LineCode} - ${train.Display}</div>
+                            <div class="info"><b>Route:</b> ${train.FirstStopCode} to ${train.LastStopCode}</div>
                             <div class="info"><b>Time:</b> ${train.StartTime} - ${train.EndTime}</div>
                             <div class="info"><b>Cars:</b> ${train.Cars}</div>
                             <div class="info ${statusClass}"><b>Status:</b> ${statusText}</div>
                             <div class="info ${delayClass}"><b>Delay:</b> ${delayText}</div>
-                            <div class="info"><b>Next Stop:</b> ${train.NextStopCode || 'N/A'}</div>
+                            <div class="info"><b>Next:</b> ${nextStop}</div>
+                            <div class="info"><b>Prev:</b> ${prevStop}</div>
                         </div>
                     `;
                     
