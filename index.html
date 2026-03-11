@@ -5,323 +5,133 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
-        body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        body { margin: 0; padding: 0; font-family: sans-serif; }
         #map { height: 100vh; width: 100%; }
-        .train-popup { min-width: 200px; }
-        .train-popup h3 { margin: 0 0 10px 0; color: #0066cc; }
-        .train-popup .info { margin: 5px 0; }
-        .train-popup .delay-good { color: green; }
-        .train-popup .delay-bad { color: red; font-weight: bold; }
-        .train-popup .moving { color: green; }
-        .train-popup .stopped { color: orange; }
         #header {
-            position: absolute;
-            top: 10px;
-            left: 60px;
-            z-index: 1000;
-            background: white;
-            padding: 10px 20px;
-            border-radius: 8px;
+            position: absolute; top: 10px; left: 10px; z-index: 1000;
+            background: white; padding: 10px 15px; border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.2);
         }
-        #header h1 { margin: 0; font-size: 18px; }
-        #header .update { font-size: 12px; color: #666; }
-        #refresh {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            z-index: 1000;
-            padding: 10px 20px;
-            background: #0066cc;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-        #refresh:hover { background: #0055aa; }
-        #alerts-btn {
-            position: absolute;
-            top: 10px;
-            right: 120px;
-            z-index: 1000;
-            padding: 10px 20px;
-            background: #ff6600;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-        #alerts-btn:hover { background: #e55a00; }
-        #stations-btn {
-            position: absolute;
-            top: 10px;
-            right: 220px;
-            z-index: 1000;
-            padding: 10px 20px;
-            background: #28a745;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-        #stations-btn:hover { background: #218838; }
-        #alerts-panel {
-            display: none;
-            position: absolute;
-            top: 60px;
-            left: 10px;
-            width: 350px;
-            max-height: 400px;
-            overflow-y: auto;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-            z-index: 1000;
-            padding: 15px;
-        }
-        #alerts-panel h2 { margin: 0 0 10px 0; font-size: 16px; }
-        .alert-item {
-            padding: 10px;
-            margin-bottom: 10px;
-            border-radius: 5px;
-            background: #fff3cd;
-            border-left: 4px solid #ffc107;
-        }
-        .alert-item .alert-line {
-            font-weight: bold;
-            font-size: 12px;
-            color: #666;
-        }
-        .alert-item .alert-subject {
-            font-weight: bold;
-            margin: 5px 0;
-        }
-        .alert-item .alert-body {
-            font-size: 12px;
-            color: #333;
-        }
-        .alert-item .alert-station {
-            font-size: 11px;
-            color: #888;
-            margin-top: 5px;
-        }
+        #header h1 { margin: 0; font-size: 16px; }
+        #header .time { font-size: 12px; color: #666; }
     </style>
 </head>
 <body>
     <div id="header">
         <h1>GO Transit Train Tracker</h1>
-        <div class="update">Loading...</div>
-    </div>
-    <button id="alerts-btn" onclick="toggleAlerts()">Alerts</button>
-    <button id="stations-btn" onclick="toggleStations()">Stations</button>
-    <button id="refresh" onclick="fetchTrains()">Refresh</button>
-    <div id="alerts-panel">
-        <h2>Service Alerts</h2>
-        <div id="alerts-list">Loading...</div>
+        <div class="time" id="updateTime">Loading...</div>
     </div>
     <div id="map"></div>
     
     <script>
         const map = L.map('map').setView([43.65, -79.38], 10);
-        
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap'
+            attribution: 'OpenStreetMap'
         }).addTo(map);
         
         const markers = {};
-        // Line colors from GO Transit
+        
+        function clearMarkers() {
+            Object.values(markers).forEach(m => map.removeLayer(m));
+            for (let key in markers) delete markers[key];
+        }
+        
         const lineColors = {
-            'LW': '#8B0000',  // Lakeshore West - Dark red
-            'LE': '#FF0000',  // Lakeshore East - Bright red
-            'MI': '#FF6600',  // Milton - Orange
-            'KI': '#008000',  // Kitchener - Green
-            'RH': '#87CEEB',  // Richmond Hill - Light blue
-            'BR': '#00008B',  // Barrie - Dark blue
-            'ST': '#8B4513'   // Stouffville - Brown
+            'LW': '#8B0000', 'LE': '#FF0000', 'MI': '#FF6600',
+            'KI': '#008000', 'RH': '#87CEEB', 'BR': '#00008B', 'ST': '#8B4513'
         };
         
-        // Major GO Stations with coordinates and line
-        const stations = [
-            { code: 'UN', name: 'Union Station', lat: 43.6425, lng: -79.3892, lines: ['LW', 'LE', 'MI', 'KI', 'RH', 'BR', 'ST'] },
-            { code: 'CL', name: 'Clarkson', lat: 43.5131, lng: -79.6332, lines: ['LW'] },
-            { code: 'LC', name: 'Long Branch', lat: 43.6100, lng: -79.6465, lines: ['LW'] },
-            { code: 'MI', name: 'Mimico', lat: 43.6285, lng: -79.6605, lines: ['LW'] },
-            { code: 'NC', name: 'North York', lat: 43.7117, lng: -79.4162, lines: ['BR'] },
-            { code: 'RH', name: 'Richmond Hill', lat: 43.8752, lng: -79.4398, lines: ['RH'] },
-            { code: 'AG', name: 'Agincourt', lat: 43.7878, lng: -79.2243, lines: ['ST'] },
-            { code: 'MU', name: 'Milliken', lat: 43.8161, lng: -79.2995, lines: ['ST'] },
-            { code: 'WH', name: 'Whitby', lat: 43.8970, lng: -78.9072, lines: ['LE'] },
-            { code: 'AJ', name: 'Ajax', lat: 43.8535, lng: -79.0320, lines: ['LE'] },
-            { code: 'PK', name: 'Pickering', lat: 43.8123, lng: -79.0865, lines: ['LE'] },
-            { code: 'OA', name: 'Oakville', lat: 43.4500, lng: -79.6825, lines: ['LW'] },
-            { code: 'BT', name: 'Burlington', lat: 43.3490, lng: -79.8142, lines: ['LW'] },
-            { code: 'AL', name: 'Aldershot', lat: 43.3167, lng: -79.8500, lines: ['LW'] },
-            { code: 'WL', name: 'West Harbour', lat: 43.2758, lng: -79.7539, lines: ['LW'] },
-            { code: 'HA', name: 'Hamilton GO', lat: 43.2579, lng: -79.8713, lines: ['LW'] },
-            { code: 'LI', name: 'Lisgar', lat: 43.7747, lng: -79.7024, lines: ['KI'] },
-            { code: 'BR', name: 'Brampton', lat: 43.6841, lng: -79.7567, lines: ['KI'] },
-            { code: 'MA', name: 'Mount Pleasant', lat: 43.6895, lng: -79.8429, lines: ['KI'] },
-            { code: 'GE', name: 'Georgetown', lat: 43.6511, lng: -79.9030, lines: ['KI'] },
-            { code: 'AU', name: 'Aurora', lat: 44.0064, lng: -79.4487, lines: ['RH'] },
-            { code: 'NK', name: 'Newmarket', lat: 44.0562, lng: -79.4624, lines: ['RH'] },
-            { code: 'BF', name: 'Bradford', lat: 44.1203, lng: -79.5586, lines: ['RH'] },
-            { code: 'EG', name: 'East Gwillimbury', lat: 44.1906, lng: -79.4394, lines: ['RH'] },
-            { code: 'ON', name: 'Oriole', lat: 43.7815, lng: -79.3384, lines: ['BR'] },
-            { code: 'KG', name: 'King', lat: 44.0428, lng: -79.5109, lines: ['BR'] },
-            { code: 'BS', name: 'Barrie South', lat: 44.3932, lng: -79.6689, lines: ['BR'] },
-            { code: 'BR', name: 'Barrie', lat: 44.3892, lng: -79.6831, lines: ['BR'] },
-            { code: 'STO', name: 'Stouffville', lat: 43.9894, lng: -79.2553, lines: ['ST'] },
-            { code: 'G', name: 'Guildwood', lat: 43.7846, lng: -79.1767, lines: ['ST'] },
-            { code: 'R', name: 'Rouge Hill', lat: 43.8105, lng: -79.1586, lines: ['ST'] },
-            { code: 'P', name: 'Pickering', lat: 43.8123, lng: -79.0865, lines: ['ST'] },
-            { code: 'ML', name: 'Milton', lat: 43.5153, lng: -79.8825, lines: ['MI'] },
-            { code: 'AC', name: 'Acton', lat: 43.6339, lng: -80.0699, lines: ['KI'] },
-            { code: 'GU', name: 'Guelph', lat: 43.5448, lng: -80.2481, lines: ['KI'] },
-            { code: 'SG', name: 'Stratford', lat: 43.3733, lng: -80.9838, lines: ['KI'] },
-        ];
+        // Station code to name lookup
+        const stationNames = {
+            'UN': 'Union Station', 'CL': 'Clarkson', 'LC': 'Long Branch', 'MI': 'Mimico',
+            'NC': 'North York', 'RH': 'Richmond Hill', 'AG': 'Agincourt', 'MU': 'Milliken',
+            'WH': 'Whitby', 'AJ': 'Ajax', 'PK': 'Pickering', 'OA': 'Oakville',
+            'BT': 'Burlington', 'AL': 'Aldershot', 'WL': 'West Harbour', 'HA': 'Hamilton GO',
+            'LI': 'Lisgar', 'BR': 'Brampton', 'MA': 'Mount Pleasant', 'GE': 'Georgetown',
+            'AU': 'Aurora', 'NK': 'Newmarket', 'BF': 'Bradford', 'EG': 'East Gwillimbury',
+            'ON': 'Oriole', 'KG': 'King', 'BS': 'Barrie South', 'BR': 'Barrie',
+            'STO': 'Stouffville', 'G': 'Guildwood', 'R': 'Rouge Hill',
+            'ML': 'Milton', 'AC': 'Acton', 'GU': 'Guelph', 'SG': 'Stratford'
+        };
         
-        // Add stations to map
-        stations.forEach(station => {
-            const color = lineColors[station.lines[0]] || '#666';
-            const stationIcon = L.divIcon({
-                className: 'station-marker',
-                html: `<div style="background:${color};width:12px;height:12px;border-radius:50%;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></div>`,
-                iconSize: [12, 12],
-                iconAnchor: [6, 6]
-            });
-            const marker = L.marker([station.lat, station.lng], { icon: stationIcon })
-                .bindPopup(`<b>${station.name}</b><br>Code: ${station.code}<br>Lines: ${station.lines.join(', ')}`)
-                .addTo(map);
-            stationMarkers.push(marker);
-        });
-        
-        function getTrainIcon(color) {
-            return L.divIcon({
-                className: 'train-marker',
-                html: `<div style="background:${color};border-radius:50%;width:20px;height:20px;border:2px solid white;box-shadow:0 2px 5px rgba(0,0,0,0.3);"></div>`,
-                iconSize: [20, 20],
-                iconAnchor: [10, 10]
-            });
-        }
-        
-        const defaultIcon = L.divIcon({
-            className: 'train-marker',
-            html: '<div style="background:#0066cc;border-radius:50%;width:20px;height:20px;border:2px solid white;box-shadow:0 2px 5px rgba(0,0,0,0.3);"></div>',
-            iconSize: [20, 20],
-            iconAnchor: [10, 10]
-        });
-        
-        function toggleAlerts() {
-            const panel = document.getElementById('alerts-panel');
-            panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
-            if (panel.style.display === 'block') fetchAlerts();
-        }
-        
-        let stationsVisible = true;
-        const stationMarkers = [];
-        
-        function toggleStations() {
-            stationsVisible = !stationsVisible;
-            stationMarkers.forEach(m => {
-                if (stationsVisible) map.addLayer(m);
-                else map.removeLayer(m);
-            });
-        }
-        
-        async function fetchAlerts() {
-            try {
-                const response = await fetch('/api/alerts');
-                const data = await response.json();
-                
-                const alerts = data.Messages.Message;
-                const container = document.getElementById('alerts-list');
-                
-                if (!alerts || alerts.length === 0) {
-                    container.innerHTML = '<p>No alerts</p>';
-                    return;
-                }
-                
-                container.innerHTML = alerts.slice(0, 10).map(alert => {
-                    const lines = alert.Lines.map(l => l.Code).join(', ');
-                    const stations = alert.Stops.map(s => s.Code).join(', ');
-                    return `
-                        <div class="alert-item">
-                            <div class="alert-line">Line: ${lines || 'System-wide'}</div>
-                            <div class="alert-subject">${alert.SubjectEnglish}</div>
-                            <div class="alert-body">${(alert.BodyEnglish || '').substring(0, 150)}...</div>
-                            ${stations ? `<div class="alert-station">Stations: ${stations}</div>` : ''}
-                        </div>
-                    `;
-                }).join('');
-                
-            } catch (error) {
-                console.error('Error:', error);
-                document.getElementById('alerts-list').textContent = 'Error loading alerts';
-            }
-        }
-        
-        async function fetchTrains() {
-            document.querySelector('.update').textContent = 'Loading...';
+        function update() {
+            document.getElementById('updateTime').textContent = 'Loading...';
             
-            try {
-                const response = await fetch('/api/trains');
-                const data = await response.json();
-                
-                const trains = data.Trips.Trip;
-                const timestamp = data.Metadata.TimeStamp;
-                
-                document.querySelector('.update').textContent = 'Updated: ' + timestamp;
-                
-                // Clear old markers
-                Object.values(markers).forEach(m => map.removeLayer(m));
-                
-                trains.forEach(train => {
-                    const lat = train.Latitude;
-                    const lng = train.Longitude;
+            fetch('/api/trains')
+                .then(r => r.json())
+                .then(data => {
+                    const trains = data.Trips.Trip || [];
+                    document.getElementById('updateTime').textContent = 'Updated: ' + data.Metadata?.TimeStamp;
                     
-                    if (!lat || !lng || lat < 40 || lng < -85) return;
+                    // Clear old markers
+                    clearMarkers();
                     
-                    const delayMins = Math.round(train.DelaySeconds / 60);
-                    const delayClass = delayMins > 0 ? 'delay-bad' : (delayMins < 0 ? 'delay-good' : '');
-                    const delayText = delayMins > 0 ? `+${delayMins} min` : (delayMins < 0 ? `${delayMins} min (Early)` : 'On Time');
-                    const statusText = train.IsInMotion ? 'Moving' : 'At Station';
-                    const statusClass = train.IsInMotion ? 'moving' : 'stopped';
-                    const nextStop = train.NextStopCode || 'Final Stop';
-                    const prevStop = train.PrevStopCode || 'Start';
-                    
-                    const popup = `
-                        <div class="train-popup">
-                            <h3>Trip ${train.TripNumber}</h3>
-                            <div class="info"><b>Line:</b> ${train.LineCode} - ${train.Display}</div>
-                            <div class="info"><b>Route:</b> ${train.FirstStopCode} to ${train.LastStopCode}</div>
-                            <div class="info"><b>Time:</b> ${train.StartTime} - ${train.EndTime}</div>
-                            <div class="info"><b>Cars:</b> ${train.Cars}</div>
-                            <div class="info ${statusClass}"><b>Status:</b> ${statusText}</div>
-                            <div class="info ${delayClass}"><b>Delay:</b> ${delayText}</div>
-                            <div class="info"><b>Next:</b> ${nextStop}</div>
-                            <div class="info"><b>Prev:</b> ${prevStop}</div>
-                        </div>
-                    `;
-                    
-                    const lineCode = train.LineCode;
-                    const color = lineColors[lineCode] || '#0066cc';
-                    const icon = getTrainIcon(color);
-                    
-                    const marker = L.marker([lat, lng], { icon: icon })
-                        .bindPopup(popup)
-                        .addTo(map);
-                    
-                    markers[train.TripNumber] = marker;
+                    trains.forEach(train => {
+                        const lat = train.Latitude;
+                        const lng = train.Longitude;
+                        if (!lat || !lng) return;
+                        
+                        const color = lineColors[train.LineCode] || '#0066cc';
+                        const icon = L.divIcon({
+                            html: '<div style="background:' + color + ';width:16px;height:16px;border-radius:50%;border:2px solid white;box-shadow:none;"></div>',
+                            iconSize: [16, 16], iconAnchor: [8, 8], className: ''
+                        });
+                        
+                        // Format delay with color
+                        const delaySec = train.DelaySeconds || 0;
+                        const delayMins = Math.round(delaySec / 60);
+                        let delayColor = '#28a745'; // green - on time/early
+                        let delayText = delayMins + ' min';
+                        if (delayMins > 0) {
+                            delayColor = '#dc3545'; // red - late
+                            delayText = '+' + delayMins + ' min';
+                        } else if (delayMins < 0) {
+                            delayColor = '#28a745';
+                            delayText = delayMins + ' min (Early)';
+                        } else {
+                            delayText = 'On Time';
+                        }
+                        
+                        // Format time to 12h
+                        const formatTime = (t) => {
+                            if (!t) return '';
+                            const [h, m] = t.split(':');
+                            const hour = parseInt(h);
+                            const ampm = hour >= 12 ? 'PM' : 'AM';
+                            const hour12 = hour % 12 || 12;
+                            return hour12 + ':' + m + ' ' + ampm;
+                        };
+                        
+                        // Get station name from code
+                        const getStationName = (code) => {
+                            if (!code) return 'N/A';
+                            return stationNames[code] || code;
+                        };
+                        
+                        const m = L.marker([lat, lng], {icon: icon})
+                            .bindPopup(
+                                '<div style="min-width:180px; font-family:sans-serif;">' +
+                                '<h3 style="margin:0 0 8px 0;color:#0066cc;">Trip ' + train.TripNumber + '</h3>' +
+                                '<div style="margin:4px 0;"><b>Line:</b> ' + train.LineCode + ' - ' + train.Display + '</div>' +
+                                '<div style="margin:4px 0;"><b>Route:</b> ' + getStationName(train.FirstStopCode) + ' to ' + getStationName(train.LastStopCode) + '</div>' +
+                                '<div style="margin:4px 0;"><b>Time:</b> ' + formatTime(train.StartTime) + ' - ' + formatTime(train.EndTime) + '</div>' +
+                                '<div style="margin:4px 0;"><b>Cars:</b> ' + train.Cars + '</div>' +
+                                '<div style="margin:4px 0;"><b>Delay:</b> <span style="color:' + delayColor + ';font-weight:bold;">' + delayText + '</span></div>' +
+                                '<div style="margin:4px 0;"><b>Next Stop:</b> ' + getStationName(train.NextStopCode) + '</div>' +
+                                '</div>'
+                            )
+                            .addTo(map);
+                        markers[train.TripNumber] = m;
+                    });
+                })
+                .catch(e => {
+                    console.error(e);
+                    document.getElementById('updateTime').textContent = 'Error loading trains';
                 });
-                
-            } catch (error) {
-                console.error('Error:', error);
-                document.querySelector('.update').textContent = 'Error loading trains';
-            }
         }
         
-        fetchTrains();
-        setInterval(fetchTrains, 60000); // Refresh every minute
+        update();
+        setInterval(update, 30000); // Refresh every 30 seconds
     </script>
 </body>
 </html>
