@@ -38,8 +38,123 @@
         
         const lineColors = {
             'LW': '#8B0000', 'LE': '#FF0000', 'MI': '#FF6600',
-            'KI': '#008000', 'RH': '#87CEEB', 'BR': '#00008B', 'ST': '#8B4513'
+            'KI': '#008000', 'GT': '#008000',  // Kitchener = Green
+            'RH': '#87CEEB', 'BR': '#00008B', 'ST': '#8B4513'
         };
+        
+        // Station coordinates (code: {lat, lng, line})
+        const stationCoords = {
+            // LAKESHORE WEST (LW) - ALL VERIFIED
+            'UN': {lat: 43.6453, lng: -79.3805, line: 'LW'},
+            'EX': {lat: 43.6352, lng: -79.4188, line: 'LW'},    // Exhibition - OSM
+            'MI': {lat: 43.6164, lng: -79.4978, line: 'LW'},    // Mimico - OSM
+            'LO': {lat: 43.5918, lng: -79.5451, line: 'LW'},    // Long Branch - OSM
+            'PORT': {lat: 43.5560, lng: -79.5868, line: 'LW'},  // Port Credit - OSM
+            'CL': {lat: 43.5126, lng: -79.6331, line: 'LW'},   // Clarkson - OSM
+            'OA': {lat: 43.4550, lng: -79.6825, line: 'LW'},    // Oakville - Wikipedia
+            'BO': {lat: 43.4163, lng: -79.7242, line: 'LW'},    // Bronte - OSM
+            'AP': {lat: 43.3802, lng: -79.7625, line: 'LW'},    // Appleby - OSM
+            'BU': {lat: 43.3405, lng: -79.8083, line: 'LW'},    // Burlington - OSM
+            'AL': {lat: 43.3133, lng: -79.8556, line: 'LW'},    // Aldershot - Wikipedia
+            'WR': {lat: 43.2667, lng: -79.8661, line: 'LW'},    // West Harbour - Wikipedia
+            'HA': {lat: 43.2531, lng: -79.8692, line: 'LW'},    // Hamilton - OSM
+            'CF': {lat: 43.2417, lng: -79.7592, line: 'LW'},    // Confederation - Wikipedia
+            'STUA': {lat: 43.1480, lng: -79.2569, line: 'LW'},  // St. Catharines - OSM
+            'NI': {lat: 43.1089, lng: -79.0633, line: 'LW'},    // Niagara Falls - Wikipedia
+            
+            // LAKESHORE EAST (LE) - ALL VERIFIED
+            'DA': {lat: 43.6867, lng: -79.2992, line: 'LE'},   // Danforth - Wiki
+            'SC': {lat: 43.7169, lng: -79.2547, line: 'LE'},   // Scarborough - OSM
+            'EG': {lat: 43.7397, lng: -79.2317, line: 'LE'},   // Eglinton - Wiki
+            'G': {lat: 43.7550, lng: -79.1971, line: 'LE'},   // Guildwood - OSM
+            'RO': {lat: 43.7803, lng: -79.1302, line: 'LE'},   // Rouge Hill - OSM
+            'PK': {lat: 43.8306, lng: -79.0850, line: 'LE'},   // Pickering - Wiki
+            'AJ': {lat: 43.8478, lng: -79.0414, line: 'LE'},   // Ajax - Wiki
+            'WH': {lat: 43.8649, lng: -78.9385, line: 'LE'},   // Whitby - OSM
+            'OS': {lat: 43.8706, lng: -78.8856, line: 'LE'},   // Oshawa - Wiki
+            
+            // MILTON (MI) - ALL VERIFIED
+            'KP': {lat: 43.63611, lng: -79.53694, line: 'MI'},  // Kipling - Wikipedia
+            'DI': {lat: 43.6082, lng: -79.5793, line: 'MI'},     // Dixie - OSM
+            'CO': {lat: 43.5827, lng: -79.6240, line: 'MI'},    // Cooksville - OSM
+            'JOHN': {lat: 43.5672, lng: -79.6660, line: 'MI'},  // Erindale - OSM
+            'SR': {lat: 43.5754, lng: -79.7092, line: 'MI'},    // Streetsville - OSM
+            'MILE': {lat: 43.5976, lng: -79.7544, line: 'MI'},  // Meadowvale - OSM
+            'LS': {lat: 43.5915, lng: -79.7882, line: 'MI'},   // Lisgar - OSM
+            'ML': {lat: 43.5236, lng: -79.8672, line: 'MI'},   // Milton - OSM
+            
+            // RICHMOND HILL (RH) - ALL VERIFIED
+            'OR': {lat: 43.7668, lng: -79.3636, line: 'RH'},   // Oriole - OSM
+            'OL': {lat: 43.7944, lng: -79.3693, line: 'RH'},   // Old Cummer - OSM
+            'LA': {lat: 43.8375, lng: -79.4225, line: 'RH'},   // Langstaff - Wiki
+            'RI': {lat: 43.8743, lng: -79.4262, line: 'RH'},   // Richmond Hill - OSM
+            'GO': {lat: 43.9417, lng: -79.3982, line: 'RH'},   // Gormley - OSM
+            'BM': {lat: 43.9756, lng: -79.3966, line: 'RH'},   // Bloomington - OSM
+            
+            // STOUFFVILLE (ST) - ALL VERIFIED
+            'KE': {lat: 43.7332, lng: -79.2625, line: 'ST'},   // Kennedy - OSM
+            'AG': {lat: 43.7861, lng: -79.2850, line: 'ST'},   // Agincourt - OSM
+            'MK': {lat: 43.8232, lng: -79.3017, line: 'ST'},   // Milliken - Wiki
+            'UI': {lat: 43.8521, lng: -79.3135, line: 'ST'},   // Unionville - OSM
+            'CE': {lat: 43.8736, lng: -79.2886, line: 'ST'},   // Centennial - OSM
+            'MR': {lat: 43.8828, lng: -79.2625, line: 'ST'},   // Markham - Wiki
+            'MJ': {lat: 43.9006, lng: -79.2631, line: 'ST'},   // Mount Joy - Wiki
+            'ST': {lat: 43.9709, lng: -79.2501, line: 'ST'},   // Stouffville - OSM
+            'LI': {lat: 43.9904, lng: -79.2370, line: 'ST'},   // Old Elm - Wiki
+            
+            // BARRIE (BR) - ALL VERIFIED
+            'DW': {lat: 43.7536, lng: -79.4786, line: 'BR'},   // Downsview Park - Wikipedia
+            'RU': {lat: 43.8389, lng: -79.4988, line: 'BR'},   // Rutherford - OSM
+            'MP': {lat: 43.8595, lng: -79.5070, line: 'BR'},   // Maple - OSM
+            'KC': {lat: 43.9201, lng: -79.5269, line: 'BR'},   // King City - OSM
+            'AU': {lat: 44.0001, lng: -79.4593, line: 'BR'},   // Aurora - OSM
+            'NE': {lat: 44.0606, lng: -79.4603, line: 'BR'},   // Newmarket - Wikipedia FIXED
+            'EA': {lat: 44.0788, lng: -79.4566, line: 'BR'},   // East Gwillimbury - OSM FIXED
+            'BD': {lat: 44.1165, lng: -79.5553, line: 'BR'},   // Bradford - OSM
+            'BA': {lat: 44.3511, lng: -79.6274, line: 'BR'},   // Barrie South - OSM FIXED
+            'AD': {lat: 44.3734, lng: -79.6868, line: 'BR'},   // Allandale Waterfront - OSM
+            
+            // KITCHENER (KI) - ALL VERIFIED
+            'BL': {lat: 43.6574, lng: -79.4450, line: 'KI'},   // Bloor - OSM
+            'MD': {lat: 43.6879, lng: -79.4862, line: 'KI'},   // Mount Dennis - OSM
+            'WE': {lat: 43.7006, lng: -79.5139, line: 'KI'},   // Weston - Wikipedia
+            'ET': {lat: 43.7060, lng: -79.5664, line: 'KI'},   // Etobicoke North - OSM
+            'MA': {lat: 43.7065, lng: -79.6394, line: 'KI'},   // Malton - OSM
+            'BE': {lat: 43.7017, lng: -79.6913, line: 'KI'},   // Bramalea - OSM
+            'BR': {lat: 43.6869, lng: -79.7647, line: 'KI'},   // Brampton - Wikipedia
+            'MO': {lat: 43.6751, lng: -79.8226, line: 'KI'},   // Mount Pleasant - OSM
+            'GE': {lat: 43.6555, lng: -79.9184, line: 'KI'},   // Georgetown - OSM
+            'AC': {lat: 43.6339, lng: -80.0347, line: 'KI'},   // Acton - Wikipedia FIXED
+            'GU': {lat: 43.5444, lng: -80.2469, line: 'KI'},   // Guelph - OSM
+            'KI': {lat: 43.4556, lng: -80.4931, line: 'KI'}    // Kitchener - Wikipedia
+        };
+        
+        // Add station markers
+        function addStationMarkers() {
+            Object.keys(stationCoords).forEach(code => {
+                const station = stationCoords[code];
+                const color = lineColors[station.line] || '#666';
+                const stationIcon = L.divIcon({
+                    html: '<div style="background:' + color + ';width:10px;height:10px;border-radius:50%;border:2px solid ' + color + ';box-shadow:0 0 3px rgba(0,0,0,0.5);"></div>',
+                    iconSize: [10, 10], iconAnchor: [5, 5], className: ''
+                });
+                L.marker([station.lat, station.lng], {icon: stationIcon})
+                    .bindPopup('<b>' + (stationNames[code] || code) + '</b><br>Line: ' + station.line)
+                    .addTo(map);
+            });
+        }
+        
+        // Check if train is at a station (within ~500m)
+        function isAtStation(lat, lng) {
+            const threshold = 0.005; // ~500m
+            for (let code in stationCoords) {
+                const s = stationCoords[code];
+                if (Math.abs(lat - s.lat) < threshold && Math.abs(lng - s.lng) < threshold) {
+                    return true;
+                }
+            }
+            return false;
+        }
         
         // Station code to name lookup
         const stationNames = {
@@ -148,18 +263,16 @@
             'ERAM': 'Eram',
             'ET': 'Elmira',
             
-            // MILTON (ML/ME)
-            'ML': 'Milton',
-            'ME': 'Milton',
-            'MSTB': 'Milton',
-            'MILE': 'Milton',
-            'BELF': 'Belfrey',
-            'STUA': 'Streetsville',
-            'MT': 'Mississauga',
-            'CO': 'Cooksville',
-            'DIX': 'Dixie',
-            'BRDI': 'Brampton',
-            'MAL': 'Malton',
+            // MILTON (MI)
+            'UN': 'Union Station',
+            'KP': 'Kipling GO Station',
+            'DI': 'Dixie GO Station',
+            'CO': 'Cooksville GO Station',
+            'JOHN': 'Erindale GO Station',
+            'SR': 'Streetsville GO Station',
+            'MILE': 'Meadowvale GO Station',
+            'LS': 'Lisgar GO Station',
+            'ML': 'Milton GO Station',
             'REV': 'Rev Mills',
             'REVU': 'Rev Mills',
             
@@ -227,6 +340,9 @@
             'BLUE': 'Blue Mountains'
         };
         
+        // Add station markers to map
+        addStationMarkers();
+        
         function update() {
             document.getElementById('updateTime').textContent = 'Loading...';
             
@@ -245,8 +361,10 @@
                         if (!lat || !lng) return;
                         
                         const color = lineColors[train.LineCode] || '#0066cc';
+                        const atStation = isAtStation(lat, lng);
+                        const borderColor = atStation ? 'black' : 'white';
                         const icon = L.divIcon({
-                            html: '<div style="background:' + color + ';width:16px;height:16px;border-radius:50%;border:2px solid white;box-shadow:none;"></div>',
+                            html: '<div style="background:' + color + ';width:16px;height:16px;border-radius:50%;border:2px solid ' + borderColor + ';box-shadow:none;"></div>',
                             iconSize: [16, 16], iconAnchor: [8, 8], className: ''
                         });
                         
