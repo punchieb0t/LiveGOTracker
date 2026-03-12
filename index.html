@@ -10,6 +10,9 @@
         /* Dark mode filter */
         .dark-mode .leaflet-tile-pane { filter: brightness(0.6) saturate(1.2); }
         .dark-tiles .leaflet-tile { filter: brightness(0.7) contrast(1.1); }
+        /* Move zoom controls to top right, below header */
+        .leaflet-control-zoom { top: 100px !important; right: 10px !important; }
+        .leaflet-control-zoom a { background: #222 !important; color: white !important; border-color: #444 !important; }
         #header {
             position: absolute; top: 10px; left: 10px; z-index: 1000;
             background: #222; color: white; padding: 10px 15px; border-radius: 8px;
