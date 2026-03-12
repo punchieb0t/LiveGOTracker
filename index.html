@@ -2,475 +2,230 @@
 <html>
 <head>
     <title>GO Transit Train Tracker</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
-        body { margin: 0; padding: 0; font-family: sans-serif; }
-        #map { height: 100vh; width: 100%; }
-        /* Dark mode filter */
-        .dark-mode .leaflet-tile-pane { filter: brightness(0.6) saturate(1.2); }
-        .dark-tiles .leaflet-tile { filter: brightness(0.7) contrast(1.1); }
-        /* Move zoom controls to top right, below header */
-        .leaflet-control-zoom { top: 100px !important; right: 10px !important; }
-        .leaflet-control-zoom a { background: #222 !important; color: white !important; border-color: #444 !important; }
+        html, body { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; background: #000; }
+        #map { height: 100%; width: 100%; z-index: 1; position: relative; }
         #header {
-            position: absolute; top: 10px; left: 10px; z-index: 1000;
-            background: #222; color: white; padding: 10px 15px; border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            position: absolute; top: 10px; left: 10px; z-index: 9999;
+            background: rgba(30,30,30,0.9); color: white; padding: 10px;
+            border-radius: 8px; font-family: sans-serif;
+            pointer-events: auto;
         }
-        #header h1 { margin: 0; font-size: 16px; }
-        #header .time { font-size: 12px; color: #aaa; }
-        #header .controls { margin-top: 8px; display: flex; gap: 8px; align-items: center; }
-        #header .toggle-btn {
+        #header * { pointer-events: auto; }
+        #header h1 { margin: 0 0 5px 0; font-size: 16px; }
+        #header .time { font-size: 11px; color: #aaa; }
+        .controls { margin-top: 8px; display: flex; gap: 5px; }
+        .btn {
             background: #444; color: white; border: 1px solid #666;
-            padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;
+            padding: 8px 14px; border-radius: 4px; font-size: 12px; cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
         }
-        #header .toggle-btn:hover { background: #555; }
-        #header .toggle-btn.active { background: #0a0; border-color: #0c0; }
+        .btn.active { background: #0a0; border-color: #0c0; }
     </style>
 </head>
 <body>
     <div id="header">
-        <h1>GO Transit Train Tracker</h1>
+        <h1>GO Transit Tracker</h1>
         <div class="time" id="updateTime">Loading...</div>
         <div class="controls">
-            <button class="toggle-btn" id="btnLight" onclick="setMapMode('light')">Light</button>
-            <button class="toggle-btn" id="btnDark" onclick="setMapMode('dark')">Dark</button>
-            <button class="toggle-btn" id="btnDarker" onclick="setMapMode('darker')">Darker</button>
+            <button class="btn" id="btnLight" onclick="setMapModeGlobal('light')">Light</button>
+            <button class="btn" id="btnDark" onclick="setMapModeGlobal('dark')">Dark</button>
+            <button class="btn active" id="btnDarker" onclick="setMapModeGlobal('darker')">Darker</button>
         </div>
     </div>
     <div id="map"></div>
     
     <script>
-        const map = L.map('map').setView([43.65, -79.38], 10);
+    // Global function for buttons
+    function setMapModeGlobal(mode) { window.setMapMode(mode); }
+    
+    (function() {
+        const map = L.map('map', { zoomControl: true }).setView([43.65, -79.38], 10);
+        
+        // Move zoom to top right
+        map.zoomControl.setPosition('topright');
+        
         let currentTileLayer = null;
         
         function setMapMode(mode) {
-            // Remove existing tile layer
-            if (currentTileLayer) {
-                map.removeLayer(currentTileLayer);
-            }
-            
-            // Update buttons
-            document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+            if (currentTileLayer) map.removeLayer(currentTileLayer);
+            document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
             document.getElementById('btn' + mode.charAt(0).toUpperCase() + mode.slice(1)).classList.add('active');
-            document.body.classList.remove('dark-mode', 'dark-tiles');
+            
+            // Reset filters
+            var tilePane = document.querySelector('.leaflet-tile-pane');
+            if (tilePane) tilePane.style.filter = '';
+            document.querySelector('#header').style.background = 'rgba(30,30,30,0.9)';
             
             if (mode === 'light') {
-                currentTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: 'OpenStreetMap'
-                });
+                currentTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution: 'OSM'});
             } else if (mode === 'dark') {
-                currentTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: 'OpenStreetMap'
-                });
-                document.body.classList.add('dark-mode');
+                currentTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution: 'OSM'});
+                tilePane = document.querySelector('.leaflet-tile-pane');
+                if (tilePane) tilePane.style.filter = 'brightness(0.5) saturate(1.3)';
+                document.querySelector('#header').style.background = 'rgba(20,20,20,0.95)';
             } else if (mode === 'darker') {
-                currentTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', {
-                    attribution: 'OpenStreetMap'
-                });
+                currentTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', {attribution: 'OSM'});
             }
-            
             currentTileLayer.addTo(map);
         }
         
-        // Default to darker mode
-        setMapMode('darker');
+        // Start with darker (CartoDB only)
+        document.getElementById('btnDarker').classList.add('active');
+        currentTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', {attribution: 'OSM'});
+        currentTileLayer.addTo(map);
         
-        const markers = {};
-        
-        function clearMarkers() {
-            Object.values(markers).forEach(m => map.removeLayer(m));
-            for (let key in markers) delete markers[key];
-        }
+        // Station coordinates
+        const stationCoords = {
+            'UN': {lat: 43.6453, lng: -79.3805, line: 'LW'},
+            'EX': {lat: 43.6352, lng: -79.4188, line: 'LW'},
+            'MI': {lat: 43.6164, lng: -79.4978, line: 'LW'},
+            'LO': {lat: 43.5918, lng: -79.5451, line: 'LW'},
+            'PORT': {lat: 43.5560, lng: -79.5868, line: 'LW'},
+            'CL': {lat: 43.5126, lng: -79.6331, line: 'LW'},
+            'OA': {lat: 43.4550, lng: -79.6825, line: 'LW'},
+            'BO': {lat: 43.4163, lng: -79.7242, line: 'LW'},
+            'AP': {lat: 43.3802, lng: -79.7625, line: 'LW'},
+            'BU': {lat: 43.3405, lng: -79.8083, line: 'LW'},
+            'AL': {lat: 43.3133, lng: -79.8556, line: 'LW'},
+            'WR': {lat: 43.2667, lng: -79.8661, line: 'LW'},
+            'HA': {lat: 43.2531, lng: -79.8692, line: 'LW'},
+            'CF': {lat: 43.2417, lng: -79.7592, line: 'LW'},
+            'STUA': {lat: 43.1480, lng: -79.2569, line: 'LW'},
+            'NI': {lat: 43.1089, lng: -79.0633, line: 'LW'},
+            'DA': {lat: 43.6867, lng: -79.2992, line: 'LE'},
+            'SC': {lat: 43.7169, lng: -79.2547, line: 'LE'},
+            'EG': {lat: 43.7397, lng: -79.2317, line: 'LE'},
+            'G': {lat: 43.7550, lng: -79.1971, line: 'LE'},
+            'RO': {lat: 43.7803, lng: -79.1302, line: 'LE'},
+            'PK': {lat: 43.8306, lng: -79.0850, line: 'LE'},
+            'AJ': {lat: 43.8478, lng: -79.0414, line: 'LE'},
+            'WH': {lat: 43.8649, lng: -78.9385, line: 'LE'},
+            'OS': {lat: 43.8706, lng: -78.8856, line: 'LE'},
+            'KP': {lat: 43.63611, lng: -79.53694, line: 'MI'},
+            'DI': {lat: 43.6082, lng: -79.5793, line: 'MI'},
+            'CO': {lat: 43.5827, lng: -79.6240, line: 'MI'},
+            'JOHN': {lat: 43.5672, lng: -79.6660, line: 'MI'},
+            'SR': {lat: 43.5754, lng: -79.7092, line: 'MI'},
+            'MILE': {lat: 43.5976, lng: -79.7544, line: 'MI'},
+            'LS': {lat: 43.5915, lng: -79.7882, line: 'MI'},
+            'ML': {lat: 43.5236, lng: -79.8672, line: 'MI'},
+            'OR': {lat: 43.7668, lng: -79.3636, line: 'RH'},
+            'OL': {lat: 43.7944, lng: -79.3693, line: 'RH'},
+            'LA': {lat: 43.8375, lng: -79.4225, line: 'RH'},
+            'RI': {lat: 43.8743, lng: -79.4262, line: 'RH'},
+            'GO': {lat: 43.9417, lng: -79.3982, line: 'RH'},
+            'BM': {lat: 43.9756, lng: -79.3966, line: 'RH'},
+            'KE': {lat: 43.7332, lng: -79.2625, line: 'ST'},
+            'AG': {lat: 43.7861, lng: -79.2850, line: 'ST'},
+            'MK': {lat: 43.8232, lng: -79.3017, line: 'ST'},
+            'UI': {lat: 43.8521, lng: -79.3135, line: 'ST'},
+            'CE': {lat: 43.8736, lng: -79.2886, line: 'ST'},
+            'MR': {lat: 43.8828, lng: -79.2625, line: 'ST'},
+            'MJ': {lat: 43.9006, lng: -79.2631, line: 'ST'},
+            'ST': {lat: 43.9709, lng: -79.2501, line: 'ST'},
+            'LI': {lat: 43.9904, lng: -79.2370, line: 'ST'},
+            'DW': {lat: 43.7536, lng: -79.4786, line: 'BR'},
+            'RU': {lat: 43.8389, lng: -79.4988, line: 'BR'},
+            'MP': {lat: 43.8595, lng: -79.5070, line: 'BR'},
+            'KC': {lat: 43.9201, lng: -79.5269, line: 'BR'},
+            'AU': {lat: 44.0001, lng: -79.4593, line: 'BR'},
+            'NE': {lat: 44.0606, lng: -79.4603, line: 'BR'},
+            'EA': {lat: 44.0788, lng: -79.4566, line: 'BR'},
+            'BD': {lat: 44.1165, lng: -79.5553, line: 'BR'},
+            'BA': {lat: 44.3511, lng: -79.6274, line: 'BR'},
+            'AD': {lat: 44.3734, lng: -79.6868, line: 'BR'},
+            'BL': {lat: 43.6574, lng: -79.4450, line: 'KI'},
+            'MD': {lat: 43.6879, lng: -79.4862, line: 'KI'},
+            'WE': {lat: 43.7006, lng: -79.5139, line: 'KI'},
+            'ET': {lat: 43.7060, lng: -79.5664, line: 'KI'},
+            'MA': {lat: 43.7065, lng: -79.6394, line: 'KI'},
+            'BE': {lat: 43.7017, lng: -79.6913, line: 'KI'},
+            'BR': {lat: 43.6869, lng: -79.7647, line: 'KI'},
+            'MO': {lat: 43.6751, lng: -79.8226, line: 'KI'},
+            'GE': {lat: 43.6555, lng: -79.9184, line: 'KI'},
+            'AC': {lat: 43.6339, lng: -80.0347, line: 'KI'},
+            'GU': {lat: 43.5444, lng: -80.2469, line: 'KI'},
+            'KI': {lat: 43.4556, lng: -80.4931, line: 'KI'}
+        };
         
         const lineColors = {
             'LW': '#8B0000', 'LE': '#FF0000', 'MI': '#FF6600',
-            'KI': '#008000', 'GT': '#008000',  // Kitchener = Green
-            'RH': '#87CEEB', 'BR': '#00008B', 'ST': '#8B4513'
+            'KI': '#008000', 'GT': '#008000', 'RH': '#87CEEB', 'BR': '#00008B', 'ST': '#8B4513'
         };
         
-        // Station coordinates (code: {lat, lng, line})
-        const stationCoords = {
-            // LAKESHORE WEST (LW) - ALL VERIFIED
-            'UN': {lat: 43.6453, lng: -79.3805, line: 'LW'},
-            'EX': {lat: 43.6352, lng: -79.4188, line: 'LW'},    // Exhibition - OSM
-            'MI': {lat: 43.6164, lng: -79.4978, line: 'LW'},    // Mimico - OSM
-            'LO': {lat: 43.5918, lng: -79.5451, line: 'LW'},    // Long Branch - OSM
-            'PORT': {lat: 43.5560, lng: -79.5868, line: 'LW'},  // Port Credit - OSM
-            'CL': {lat: 43.5126, lng: -79.6331, line: 'LW'},   // Clarkson - OSM
-            'OA': {lat: 43.4550, lng: -79.6825, line: 'LW'},    // Oakville - Wikipedia
-            'BO': {lat: 43.4163, lng: -79.7242, line: 'LW'},    // Bronte - OSM
-            'AP': {lat: 43.3802, lng: -79.7625, line: 'LW'},    // Appleby - OSM
-            'BU': {lat: 43.3405, lng: -79.8083, line: 'LW'},    // Burlington - OSM
-            'AL': {lat: 43.3133, lng: -79.8556, line: 'LW'},    // Aldershot - Wikipedia
-            'WR': {lat: 43.2667, lng: -79.8661, line: 'LW'},    // West Harbour - Wikipedia
-            'HA': {lat: 43.2531, lng: -79.8692, line: 'LW'},    // Hamilton - OSM
-            'CF': {lat: 43.2417, lng: -79.7592, line: 'LW'},    // Confederation - Wikipedia
-            'STUA': {lat: 43.1480, lng: -79.2569, line: 'LW'},  // St. Catharines - OSM
-            'NI': {lat: 43.1089, lng: -79.0633, line: 'LW'},    // Niagara Falls - Wikipedia
-            
-            // LAKESHORE EAST (LE) - ALL VERIFIED
-            'DA': {lat: 43.6867, lng: -79.2992, line: 'LE'},   // Danforth - Wiki
-            'SC': {lat: 43.7169, lng: -79.2547, line: 'LE'},   // Scarborough - OSM
-            'EG': {lat: 43.7397, lng: -79.2317, line: 'LE'},   // Eglinton - Wiki
-            'G': {lat: 43.7550, lng: -79.1971, line: 'LE'},   // Guildwood - OSM
-            'RO': {lat: 43.7803, lng: -79.1302, line: 'LE'},   // Rouge Hill - OSM
-            'PK': {lat: 43.8306, lng: -79.0850, line: 'LE'},   // Pickering - Wiki
-            'AJ': {lat: 43.8478, lng: -79.0414, line: 'LE'},   // Ajax - Wiki
-            'WH': {lat: 43.8649, lng: -78.9385, line: 'LE'},   // Whitby - OSM
-            'OS': {lat: 43.8706, lng: -78.8856, line: 'LE'},   // Oshawa - Wiki
-            
-            // MILTON (MI) - ALL VERIFIED
-            'KP': {lat: 43.63611, lng: -79.53694, line: 'MI'},  // Kipling - Wikipedia
-            'DI': {lat: 43.6082, lng: -79.5793, line: 'MI'},     // Dixie - OSM
-            'CO': {lat: 43.5827, lng: -79.6240, line: 'MI'},    // Cooksville - OSM
-            'JOHN': {lat: 43.5672, lng: -79.6660, line: 'MI'},  // Erindale - OSM
-            'SR': {lat: 43.5754, lng: -79.7092, line: 'MI'},    // Streetsville - OSM
-            'MILE': {lat: 43.5976, lng: -79.7544, line: 'MI'},  // Meadowvale - OSM
-            'LS': {lat: 43.5915, lng: -79.7882, line: 'MI'},   // Lisgar - OSM
-            'ML': {lat: 43.5236, lng: -79.8672, line: 'MI'},   // Milton - OSM
-            
-            // RICHMOND HILL (RH) - ALL VERIFIED
-            'OR': {lat: 43.7668, lng: -79.3636, line: 'RH'},   // Oriole - OSM
-            'OL': {lat: 43.7944, lng: -79.3693, line: 'RH'},   // Old Cummer - OSM
-            'LA': {lat: 43.8375, lng: -79.4225, line: 'RH'},   // Langstaff - Wiki
-            'RI': {lat: 43.8743, lng: -79.4262, line: 'RH'},   // Richmond Hill - OSM
-            'GO': {lat: 43.9417, lng: -79.3982, line: 'RH'},   // Gormley - OSM
-            'BM': {lat: 43.9756, lng: -79.3966, line: 'RH'},   // Bloomington - OSM
-            
-            // STOUFFVILLE (ST) - ALL VERIFIED
-            'KE': {lat: 43.7332, lng: -79.2625, line: 'ST'},   // Kennedy - OSM
-            'AG': {lat: 43.7861, lng: -79.2850, line: 'ST'},   // Agincourt - OSM
-            'MK': {lat: 43.8232, lng: -79.3017, line: 'ST'},   // Milliken - Wiki
-            'UI': {lat: 43.8521, lng: -79.3135, line: 'ST'},   // Unionville - OSM
-            'CE': {lat: 43.8736, lng: -79.2886, line: 'ST'},   // Centennial - OSM
-            'MR': {lat: 43.8828, lng: -79.2625, line: 'ST'},   // Markham - Wiki
-            'MJ': {lat: 43.9006, lng: -79.2631, line: 'ST'},   // Mount Joy - Wiki
-            'ST': {lat: 43.9709, lng: -79.2501, line: 'ST'},   // Stouffville - OSM
-            'LI': {lat: 43.9904, lng: -79.2370, line: 'ST'},   // Old Elm - Wiki
-            
-            // BARRIE (BR) - ALL VERIFIED
-            'DW': {lat: 43.7536, lng: -79.4786, line: 'BR'},   // Downsview Park - Wikipedia
-            'RU': {lat: 43.8389, lng: -79.4988, line: 'BR'},   // Rutherford - OSM
-            'MP': {lat: 43.8595, lng: -79.5070, line: 'BR'},   // Maple - OSM
-            'KC': {lat: 43.9201, lng: -79.5269, line: 'BR'},   // King City - OSM
-            'AU': {lat: 44.0001, lng: -79.4593, line: 'BR'},   // Aurora - OSM
-            'NE': {lat: 44.0606, lng: -79.4603, line: 'BR'},   // Newmarket - Wikipedia FIXED
-            'EA': {lat: 44.0788, lng: -79.4566, line: 'BR'},   // East Gwillimbury - OSM FIXED
-            'BD': {lat: 44.1165, lng: -79.5553, line: 'BR'},   // Bradford - OSM
-            'BA': {lat: 44.3511, lng: -79.6274, line: 'BR'},   // Barrie South - OSM FIXED
-            'AD': {lat: 44.3734, lng: -79.6868, line: 'BR'},   // Allandale Waterfront - OSM
-            
-            // KITCHENER (KI) - ALL VERIFIED
-            'BL': {lat: 43.6574, lng: -79.4450, line: 'KI'},   // Bloor - OSM
-            'MD': {lat: 43.6879, lng: -79.4862, line: 'KI'},   // Mount Dennis - OSM
-            'WE': {lat: 43.7006, lng: -79.5139, line: 'KI'},   // Weston - Wikipedia
-            'ET': {lat: 43.7060, lng: -79.5664, line: 'KI'},   // Etobicoke North - OSM
-            'MA': {lat: 43.7065, lng: -79.6394, line: 'KI'},   // Malton - OSM
-            'BE': {lat: 43.7017, lng: -79.6913, line: 'KI'},   // Bramalea - OSM
-            'BR': {lat: 43.6869, lng: -79.7647, line: 'KI'},   // Brampton - Wikipedia
-            'MO': {lat: 43.6751, lng: -79.8226, line: 'KI'},   // Mount Pleasant - OSM
-            'GE': {lat: 43.6555, lng: -79.9184, line: 'KI'},   // Georgetown - OSM
-            'AC': {lat: 43.6339, lng: -80.0347, line: 'KI'},   // Acton - Wikipedia FIXED
-            'GU': {lat: 43.5444, lng: -80.2469, line: 'KI'},   // Guelph - OSM
-            'KI': {lat: 43.4556, lng: -80.4931, line: 'KI'}    // Kitchener - Wikipedia
+        const stationNames = {
+            'UN': 'Union Station', 'EX': 'Exhibition', 'MI': 'Mimico', 'LO': 'Long Branch',
+            'PORT': 'Port Credit', 'CL': 'Clarkson', 'OA': 'Oakville', 'BO': 'Bronte',
+            'AP': 'Appleby', 'BU': 'Burlington', 'AL': 'Aldershot', 'WR': 'West Harbour',
+            'HA': 'Hamilton', 'CF': 'Confederation', 'STUA': 'St. Catharines', 'NI': 'Niagara Falls',
+            'DA': 'Danforth', 'SC': 'Scarborough', 'EG': 'Eglinton', 'G': 'Guildwood',
+            'RO': 'Rouge Hill', 'PK': 'Pickering', 'AJ': 'Ajax', 'WH': 'Whitby', 'OS': 'Oshawa',
+            'KP': 'Kipling', 'DI': 'Dixie', 'CO': 'Cooksville', 'JOHN': 'Erindale',
+            'SR': 'Streetsville', 'MILE': 'Meadowvale', 'LS': 'Lisgar', 'ML': 'Milton',
+            'OR': 'Oriole', 'OL': 'Old Cummer', 'LA': 'Langstaff', 'RI': 'Richmond Hill',
+            'GO': 'Gormley', 'BM': 'Bloomington', 'KE': 'Kennedy', 'AG': 'Agincourt',
+            'MK': 'Milliken', 'UI': 'Unionville', 'CE': 'Centennial', 'MR': 'Markham',
+            'MJ': 'Mount Joy', 'ST': 'Stouffville', 'LI': 'Old Elm', 'DW': 'Downsview Park',
+            'RU': 'Rutherford', 'MP': 'Maple', 'KC': 'King City', 'AU': 'Aurora',
+            'NE': 'Newmarket', 'EA': 'East Gwillimbury', 'BD': 'Bradford', 'BA': 'Barrie South',
+            'AD': 'Allandale Waterfront', 'BL': 'Bloor', 'MD': 'Mount Dennis', 'WE': 'Weston',
+            'ET': 'Etobicoke North', 'MA': 'Malton', 'BE': 'Bramalea', 'BR': 'Brampton',
+            'MO': 'Mount Pleasant', 'GE': 'Georgetown', 'AC': 'Acton', 'GU': 'Guelph', 'KI': 'Kitchener'
         };
         
         // Add station markers
-        function addStationMarkers() {
-            Object.keys(stationCoords).forEach(code => {
-                const station = stationCoords[code];
-                const color = lineColors[station.line] || '#666';
-                const stationIcon = L.divIcon({
-                    html: '<div style="background:' + color + ';width:8px;height:8px;border-radius:0;border:2px solid ' + color + ';box-shadow:0 0 3px rgba(0,0,0,0.5);"></div>',
-                    iconSize: [8, 8], iconAnchor: [4, 4], className: ''
+        Object.keys(stationCoords).forEach(code => {
+            const s = stationCoords[code];
+            const color = lineColors[s.line] || '#666';
+            const icon = L.divIcon({
+                html: '<div style="background:'+color+';width:8px;height:8px;border-radius:0;border:2px solid '+color+';"></div>',
+                iconSize: [8, 8], iconAnchor: [4, 4]
+            });
+            L.marker([s.lat, s.lng], {icon: icon}).bindPopup(stationNames[code] || code).addTo(map);
+        });
+        
+        // Add trains
+        function update() {
+            document.getElementById('updateTime').textContent = 'Loading...';
+            fetch('/api/trains').then(r => r.json()).then(data => {
+                const trains = data.Trips.Trip || [];
+                document.getElementById('updateTime').textContent = 'Updated: ' + (data.Metadata?.TimeStamp || 'now');
+                
+                // Clear old markers
+                Object.values(window.trainMarkers || {}).forEach(m => map.removeLayer(m));
+                window.trainMarkers = {};
+                
+                trains.forEach(t => {
+                    if (!t.Latitude || !t.Longitude) return;
+                    const color = lineColors[t.LineCode] || '#0066cc';
+                    const icon = L.divIcon({
+                        html: '<div style="background:'+color+';width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 0 3px rgba(0,0,0,0.5);"></div>',
+                        iconSize: [14, 14], iconAnchor: [7, 7]
+                    });
+                    const m = L.marker([t.Latitude, t.Longitude], {icon: icon})
+                        .bindPopup('<b>Trip ' + t.TripNumber + '</b><br>' + t.LineCode + ': ' + t.Display)
+                        .addTo(map);
+                    window.trainMarkers[t.TripNumber] = m;
                 });
-                L.marker([station.lat, station.lng], {icon: stationIcon})
-                    .bindPopup('<b>' + (stationNames[code] || code) + '</b><br>Line: ' + station.line)
-                    .addTo(map);
+            }).catch(e => {
+                console.error(e);
+                document.getElementById('updateTime').textContent = 'Error';
             });
         }
         
-        // Check if train is at a station (within ~500m)
-        function isAtStation(lat, lng) {
-            const threshold = 0.005; // ~500m
-            for (let code in stationCoords) {
-                const s = stationCoords[code];
-                if (Math.abs(lat - s.lat) < threshold && Math.abs(lng - s.lng) < threshold) {
-                    return true;
-                }
-            }
-            return false;
-        }
-        
-        // Station code to name lookup
-        const stationNames = {
-            // LAKESHORE WEST (LW)
-            'UN': 'Union Station',
-            'LC': 'Long Branch',
-            'MI': 'Mimico',
-            'MIME': 'Mimico',
-            'CL': 'Clarkson',
-            'CLAR': 'Clarkson',
-            'PORT': 'Port Credit',
-            'OA': 'Oakville',
-            'OAKY': 'Oakville',
-            'OBIC': 'Oakville Bus Terminal',
-            'OAKW': 'Oakville West',
-            'BT': 'Burlington',
-            'BURL': 'Burlington',
-            'BATH': 'Bath',
-            'AL': 'Aldershot',
-            'WL': 'West Harbour',
-            'HA': 'Hamilton GO',
-            'HBAU': 'Hamilton (Bridge)',
-            'HBCH': 'Hamilton (Central)',
-            'HBPO': 'Hamilton (Bypass)',
-            'HBRO': 'Hamilton (Brow)',
-            'HBGU': 'Hamilton (Guelph)',
-            'HBCR': 'Hamilton (Cherry)',
-            'HBMC': 'Hamilton (McMaster)',
-            'HAMJ': 'Hamilton (James)',
-            'HORN': 'Horning',
-            'AP': 'Appleby',
-            'BURE': 'Burlington (North)',
-            'CANP': 'Canpara',
-            'DDRN': 'Don River',
-            'REVU': 'Rev Mills',
-            'STUA': 'Streetsville',
-            'STWE': 'Streetsville West',
-            'WR': 'West River',
-            'HALW': 'Halwest',
-            'HOLL': 'Hollings',
-            
-            // LAKESHORE EAST (LE)
-            'G': 'Guildwood',
-            'R': 'Rouge Hill',
-            'DA': 'Danforth',
-            'SC': 'St Catharines',
-            'ST': 'Scarborough',
-            'RU': 'Rutherford',
-            'KN': 'Kennedy',
-            'AE': 'Agincourt',
-            'AG': 'Agincourt',
-            'MK': 'Milliken',
-            'MU': 'Milliken',
-            'PK': 'Pickering',
-            'AJ': 'Ajax',
-            'WH': 'Whitby',
-            'OS': 'Oshawa',
-            'EG': 'East Gwillimbury',
-            'DURJ': 'Durham',
-            'GUCL': 'Guildwood',
-            'SCOT': 'Scotch',
-            'THIE': 'Thickson',
-            'NI': 'Niagara',
-            
-            // RICHMOND HILL (RH)
-            'BM': 'Bloomington',
-            'GORM': 'Gormley',
-            'CARR': 'Carrying Place',
-            'KNG': 'King',
-            'KC': 'King City',
-            'KD': 'King City',
-            'GO': 'Gormley',
-            'ORIS': 'Oriole',
-            
-            // BARRIE (BR)
-            'BS': 'Barrie South',
-            'BA': 'Barrie',
-            'BR': 'Barrie',
-            'AD': 'Ade',
-            'SIM': 'Simcoe',
-            'BAR': 'Barrie',
-            'WAS': 'Washago',
-            'GRA': 'Gravenhurst',
-            'MUS': 'Muskoka',
-            'RUT': 'Rutherford',
-            'NE': 'North York',
-            'DW': 'Downsview',
-            'CHAS': 'Chase',
-            'BU': 'Buttonville',
-            'BO': 'Bowmanville',
-            
-            // KITCHENER (KI)
-            'KI': 'Kitchener',
-            'GT': 'Georgetown',
-            'GE': 'Georgetown',
-            'GETE': 'Georgetown',
-            'AC': 'Acton',
-            'GU': 'Guelph',
-            'STR': 'Stratford',
-            'SG': 'Stratford',
-            'WATE': 'Waterloo',
-            'WATW': 'Waterloo',
-            'WICE': 'Windsor',
-            'CONTI': 'Conti',
-            'STWE': 'Stratford West',
-            'ERAM': 'Eram',
-            'ET': 'Elmira',
-            
-            // MILTON (MI)
-            'UN': 'Union Station',
-            'KP': 'Kipling GO Station',
-            'DI': 'Dixie GO Station',
-            'CO': 'Cooksville GO Station',
-            'JOHN': 'Erindale GO Station',
-            'SR': 'Streetsville GO Station',
-            'MILE': 'Meadowvale GO Station',
-            'LS': 'Lisgar GO Station',
-            'ML': 'Milton GO Station',
-            'REV': 'Rev Mills',
-            'REVU': 'Rev Mills',
-            
-            // NIAGARA (NI)
-            'NIAG': 'Niagara Falls',
-            'THIW': 'Thorold',
-            'WEG': 'Welland',
-            'PO': 'Port Colborne',
-            'POCL': 'Port Colborne',
-            'STCA': 'St Catharines',
-            
-            // OTHER
-            'NC': 'North York',
-            'ON': 'Oriole',
-            'DON': 'Don Mills',
-            'FLET': 'Flemingdon',
-            'NK': 'Newmarket',
-            'AU': 'Aurora',
-            'KG': 'King',
-            'BR': 'Brampton',
-            'LI': 'Lisgar',
-            'SC': 'St Clair',
-            'WINS': 'Windsor',
-            'DET': 'Detroit',
-            'LO': 'London',
-            'SARN': 'Sarnia',
-            'WIN': 'Windsor',
-            'BE': 'Belleville',
-            'TR': 'Trenton',
-            'KING': 'King',
-            'PET': 'Peterborough',
-            'CORT': 'Cortez',
-            'NICK': 'Nickel',
-            'SNAK': 'Snake',
-            'SILV': 'Silver',
-            'SCPK': 'Scotch',
-            'QUAN': 'Quan',
-            'CHER': 'Cherry',
-            'SHER': 'Sheppard',
-            'SCAJ': 'Scarborough',
-            'JARV': 'Jarvis',
-            'LACL': 'Lac La',
-            'MP': 'Maple',
-            'MJ': 'Maple',
-            'LAID': 'Laidlaw',
-            'DUFF': 'Duffern',
-            'HUMV': 'HumanView',
-            'KERR': 'Kerr',
-            'PAWE': 'Pawnee',
-            '9THL': '9th Line',
-            'BL': 'Bloomington',
-            'DI': 'Dixie',
-            'RO': 'Rogers',
-            'PIN': 'Pine',
-            'VICT': 'Victoria',
-            'NORV': 'Norville',
-            'LE': 'Lakeshore East',
-            'LW': 'Lakeshore West',
-            'SPIC': 'Spicer',
-            'LEFR': 'LeFran',
-            'EN': 'Eldorado',
-            'N': 'Newcastle',
-            'E': 'East',
-            'W': 'West',
-            'BLUE': 'Blue Mountains'
-        };
-        
-        // Add station markers to map
-        addStationMarkers();
-        
-        function update() {
-            document.getElementById('updateTime').textContent = 'Loading...';
-            
-            fetch('/api/trains')
-                .then(r => r.json())
-                .then(data => {
-                    const trains = data.Trips.Trip || [];
-                    document.getElementById('updateTime').textContent = 'Updated: ' + data.Metadata?.TimeStamp;
-                    
-                    // Clear old markers
-                    clearMarkers();
-                    
-                    trains.forEach(train => {
-                        const lat = train.Latitude;
-                        const lng = train.Longitude;
-                        if (!lat || !lng) return;
-                        
-                        const color = lineColors[train.LineCode] || '#0066cc';
-                        const atStation = isAtStation(lat, lng);
-                        const borderColor = atStation ? 'black' : 'white';
-                        const icon = L.divIcon({
-                            html: '<div style="background:' + color + ';width:16px;height:16px;border-radius:50%;border:2px solid ' + borderColor + ';box-shadow:none;"></div>',
-                            iconSize: [16, 16], iconAnchor: [8, 8], className: ''
-                        });
-                        
-                        // Format delay with color
-                        const delaySec = train.DelaySeconds || 0;
-                        const delayMins = Math.round(delaySec / 60);
-                        let delayColor = '#28a745'; // green - on time/early
-                        let delayText = delayMins + ' min';
-                        if (delayMins > 0) {
-                            delayColor = '#dc3545'; // red - late
-                            delayText = '+' + delayMins + ' min';
-                        } else if (delayMins < 0) {
-                            delayColor = '#28a745';
-                            delayText = delayMins + ' min (Early)';
-                        } else {
-                            delayText = 'On Time';
-                        }
-                        
-                        // Format time to 12h
-                        const formatTime = (t) => {
-                            if (!t) return '';
-                            const [h, m] = t.split(':');
-                            const hour = parseInt(h);
-                            const ampm = hour >= 12 ? 'PM' : 'AM';
-                            const hour12 = hour % 12 || 12;
-                            return hour12 + ':' + m + ' ' + ampm;
-                        };
-                        
-                        // Get station name from code
-                        const getStationName = (code) => {
-                            if (!code) return 'N/A';
-                            return stationNames[code] || code;
-                        };
-                        
-                        const m = L.marker([lat, lng], {icon: icon})
-                            .bindPopup(
-                                '<div style="min-width:180px; font-family:sans-serif;">' +
-                                '<h3 style="margin:0 0 8px 0;color:#0066cc;">Trip ' + train.TripNumber + '</h3>' +
-                                '<div style="margin:4px 0;"><b>Line:</b> ' + train.LineCode + ' - ' + train.Display + '</div>' +
-                                '<div style="margin:4px 0;"><b>Route:</b> ' + getStationName(train.FirstStopCode) + ' to ' + getStationName(train.LastStopCode) + '</div>' +
-                                '<div style="margin:4px 0;"><b>Time:</b> ' + formatTime(train.StartTime) + ' - ' + formatTime(train.EndTime) + '</div>' +
-                                '<div style="margin:4px 0;"><b>Cars:</b> ' + train.Cars + '</div>' +
-                                '<div style="margin:4px 0;"><b>Delay:</b> <span style="color:' + delayColor + ';font-weight:bold;">' + delayText + '</span></div>' +
-                                '<div style="margin:4px 0;"><b>Next Stop:</b> ' + getStationName(train.NextStopCode) + '</div>' +
-                                '</div>'
-                            )
-                            .addTo(map);
-                        markers[train.TripNumber] = m;
-                    });
-                })
-                .catch(e => {
-                    console.error(e);
-                    document.getElementById('updateTime').textContent = 'Error loading trains';
-                });
-        }
-        
         update();
-        setInterval(update, 30000); // Refresh every 30 seconds
+        setInterval(update, 30000);
+        
+        // Expose setMapMode globally
+        window.setMapMode = setMapMode;
+    })();
     </script>
 </body>
 </html>
