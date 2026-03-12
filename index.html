@@ -7,27 +7,72 @@
     <style>
         body { margin: 0; padding: 0; font-family: sans-serif; }
         #map { height: 100vh; width: 100%; }
+        /* Dark mode filter */
+        .dark-mode .leaflet-tile-pane { filter: brightness(0.6) saturate(1.2); }
+        .dark-tiles .leaflet-tile { filter: brightness(0.7) contrast(1.1); }
         #header {
             position: absolute; top: 10px; left: 10px; z-index: 1000;
-            background: white; padding: 10px 15px; border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            background: #222; color: white; padding: 10px 15px; border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
         }
         #header h1 { margin: 0; font-size: 16px; }
-        #header .time { font-size: 12px; color: #666; }
+        #header .time { font-size: 12px; color: #aaa; }
+        #header .controls { margin-top: 8px; display: flex; gap: 8px; align-items: center; }
+        #header .toggle-btn {
+            background: #444; color: white; border: 1px solid #666;
+            padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;
+        }
+        #header .toggle-btn:hover { background: #555; }
+        #header .toggle-btn.active { background: #0a0; border-color: #0c0; }
     </style>
 </head>
 <body>
     <div id="header">
         <h1>GO Transit Train Tracker</h1>
         <div class="time" id="updateTime">Loading...</div>
+        <div class="controls">
+            <button class="toggle-btn" id="btnLight" onclick="setMapMode('light')">Light</button>
+            <button class="toggle-btn" id="btnDark" onclick="setMapMode('dark')">Dark</button>
+            <button class="toggle-btn" id="btnDarker" onclick="setMapMode('darker')">Darker</button>
+        </div>
     </div>
     <div id="map"></div>
     
     <script>
         const map = L.map('map').setView([43.65, -79.38], 10);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: 'OpenStreetMap'
-        }).addTo(map);
+        let currentTileLayer = null;
+        
+        function setMapMode(mode) {
+            // Remove existing tile layer
+            if (currentTileLayer) {
+                map.removeLayer(currentTileLayer);
+            }
+            
+            // Update buttons
+            document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('btn' + mode.charAt(0).toUpperCase() + mode.slice(1)).classList.add('active');
+            document.body.classList.remove('dark-mode', 'dark-tiles');
+            
+            if (mode === 'light') {
+                currentTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: 'OpenStreetMap'
+                });
+            } else if (mode === 'dark') {
+                currentTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: 'OpenStreetMap'
+                });
+                document.body.classList.add('dark-mode');
+            } else if (mode === 'darker') {
+                currentTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', {
+                    attribution: 'OpenStreetMap'
+                });
+            }
+            
+            currentTileLayer.addTo(map);
+        }
+        
+        // Default to darker mode
+        setMapMode('darker');
         
         const markers = {};
         
