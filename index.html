@@ -135,8 +135,8 @@
                 const station = stationCoords[code];
                 const color = lineColors[station.line] || '#666';
                 const stationIcon = L.divIcon({
-                    html: '<div style="background:' + color + ';width:10px;height:10px;border-radius:50%;border:2px solid ' + color + ';box-shadow:0 0 3px rgba(0,0,0,0.5);"></div>',
-                    iconSize: [10, 10], iconAnchor: [5, 5], className: ''
+                    html: '<div style="background:' + color + ';width:8px;height:8px;border-radius:0;border:2px solid ' + color + ';box-shadow:0 0 3px rgba(0,0,0,0.5);"></div>',
+                    iconSize: [8, 8], iconAnchor: [4, 4], className: ''
                 });
                 L.marker([station.lat, station.lng], {icon: stationIcon})
                     .bindPopup('<b>' + (stationNames[code] || code) + '</b><br>Line: ' + station.line)
